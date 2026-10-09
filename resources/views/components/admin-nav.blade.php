@@ -1,9 +1,9 @@
 @php
-    $isOwner = auth()->user()?->currentApartment()?->pivot?->role === 'owner';
+    $isOwner = auth()->user()?->currentVenue()?->pivot?->role === 'owner';
 
     $navItems = [
         ['route' => 'admin.dashboard', 'label' => 'Dashboard'],
-        ['route' => 'admin.unit-types.index', 'label' => 'Units'],
+        ['route' => 'admin.space-types.index', 'label' => 'Spaces'],
         ['route' => 'admin.knowledge-items.index', 'label' => 'Knowledge base'],
         ['route' => 'admin.bookings.index', 'label' => 'Bookings'],
         ['route' => 'admin.handovers.index', 'label' => 'Handovers'],

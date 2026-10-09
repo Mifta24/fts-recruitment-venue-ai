@@ -3,7 +3,7 @@
         <div class="order-last rounded-xl border border-stone-200 bg-white lg:order-first">
             <div class="border-b border-stone-200 px-4 py-3">
                 <p class="font-medium text-stone-900">Conversation</p>
-                <p class="text-xs text-stone-500">{{ $handover->conversation->guest_name ?? 'Guest' }} · {{ strtoupper($handover->conversation->locale) }}</p>
+                <p class="text-xs text-stone-500">{{ $handover->conversation->guest_name ?? 'Visitor' }} · {{ strtoupper($handover->conversation->locale) }}</p>
             </div>
             <div class="max-h-[60vh] lg:max-h-[520px] space-y-3 overflow-y-auto px-4 py-4">
                 @foreach ($handover->conversation->messages as $message)
@@ -27,7 +27,7 @@
             @if ($handover->status === 'open')
                 <form method="POST" action="{{ route('admin.handovers.reply', $handover) }}" class="flex flex-wrap items-center gap-2 border-t border-stone-200 p-3 sm:flex-nowrap">
                     @csrf
-                    <input type="text" name="message" required placeholder="Reply to the guest…" class="min-w-0 flex-1 basis-full rounded-lg border border-stone-300 px-3 py-2.5 text-base sm:basis-auto sm:text-sm">
+                    <input type="text" name="message" required placeholder="Reply to the organiser…" class="min-w-0 flex-1 basis-full rounded-lg border border-stone-300 px-3 py-2.5 text-base sm:basis-auto sm:text-sm">
                     <button type="submit" class="rounded-lg bg-ink px-4 py-2 text-sm font-medium text-white hover:bg-signal hover:text-signal-ink">Send</button>
                 </form>
             @endif

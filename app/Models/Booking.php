@@ -8,20 +8,22 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable([
     'reference',
-    'apartment_id',
-    'unit_type_id',
+    'venue_id',
+    'space_type_id',
     'conversation_id',
     'guest_name',
+    'company_name',
+    'event_type',
     'guest_email',
     'guest_phone',
     'contact_type',
     'locale',
-    'check_in',
-    'check_out',
-    'adults',
-    'children',
-    'unit_count',
-    'extra_bed',
+    'start_date',
+    'end_date',
+    'candidates',
+    'recruiters',
+    'space_count',
+    'tech_crew',
     'total_price',
     'status',
     'notes',
@@ -35,8 +37,15 @@ class Booking extends Model
     public const STATUS_CANCELLED = 'cancelled';
 
     /**
+     * What the booked venue is used for.
+     *
+     * @var list<string>
+     */
+    public const EVENT_TYPES = ['job_fair', 'walk_in_interview', 'assessment', 'briefing', 'campus_hiring', 'other'];
+
+    /**
      * Which status a booking may move to from its current one. Cancelled is
-     * final: its units went back to the inventory and are not held any more.
+     * final: its spaces went back to the inventory and are not held any more.
      *
      * @var array<string, list<string>>
      */
@@ -49,21 +58,21 @@ class Booking extends Model
     protected function casts(): array
     {
         return [
-            'check_in' => 'date',
-            'check_out' => 'date',
-            'extra_bed' => 'boolean',
+            'start_date' => 'date',
+            'end_date' => 'date',
+            'tech_crew' => 'boolean',
             'total_price' => 'decimal:2',
         ];
     }
 
-    public function apartment(): BelongsTo
+    public function venue(): BelongsTo
     {
-        return $this->belongsTo(Apartment::class);
+        return $this->belongsTo(Venue::class);
     }
 
-    public function unitType(): BelongsTo
+    public function spaceType(): BelongsTo
     {
-        return $this->belongsTo(UnitType::class)->withTrashed();
+        return $this->belongsTo(SpaceType::class)->withTrashed();
     }
 
     public function conversation(): BelongsTo
@@ -92,8 +101,8 @@ class Booking extends Model
         return in_array($status, self::TRANSITIONS[$this->status] ?? [], true);
     }
 
-    public function nights(): int
+    public function days(): int
     {
-        return $this->check_in->diffInDays($this->check_out);
+        return $this->start_date->diffInDays($this->end_date) + 1;
     }
 }

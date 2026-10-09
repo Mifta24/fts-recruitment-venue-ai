@@ -2,16 +2,16 @@
     "version": "0.0.1",
     "configurations": [
         {
-            "name": "apartment-ai-dev",
+            "name": "recruitment-venue-ai-dev",
             "runtimeExecutable": "php",
             "runtimeArgs": ["artisan", "dev"],
             "port": 8000
         },
         {
-            "name": "apartment-ai-preview",
+            "name": "recruitment-venue-ai-preview",
             "runtimeExecutable": "php",
-            "runtimeArgs": ["artisan", "serve", "--port=8030"],
-            "port": 8030
+            "runtimeArgs": ["artisan", "serve", "--port=8031"],
+            "port": 8031
         }
     ]
 }

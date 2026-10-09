@@ -13,15 +13,15 @@
         <a href="{{ route('admin.handovers.index') }}" class="rounded-xl border p-4 {{ $stats['open_handovers'] > 0 ? 'border-amber-300 bg-amber-50' : 'border-stone-200 bg-white' }}">
             <p class="{{ $label }}">Open handovers</p>
             <p class="mt-2 text-3xl font-semibold text-stone-900">{{ $stats['open_handovers'] }}</p>
-            <p class="mt-1 text-xs {{ $stats['open_handovers'] > 0 ? 'font-medium text-amber-700' : 'text-stone-400' }}">{{ $stats['open_handovers'] > 0 ? 'A guest is waiting for staff' : 'All answered' }}</p>
+            <p class="mt-1 text-xs {{ $stats['open_handovers'] > 0 ? 'font-medium text-amber-700' : 'text-stone-400' }}">{{ $stats['open_handovers'] > 0 ? 'An organiser is waiting for the team' : 'All answered' }}</p>
         </a>
         <div class="rounded-xl border border-stone-200 bg-white p-4">
-            <p class="{{ $label }}">Move-ins · {{ $arrivalDays }} days</p>
+            <p class="{{ $label }}">Events starting · {{ $arrivalDays }} days</p>
             <p class="mt-2 text-3xl font-semibold text-stone-900">{{ $stats['arrivals'] }}</p>
             <p class="mt-1 text-xs text-stone-400">Confirmed bookings</p>
         </div>
         <div class="rounded-xl border border-stone-200 bg-white p-4">
-            <p class="{{ $label }}">Occupancy · {{ $occupancyDays }} days</p>
+            <p class="{{ $label }}">Utilisation · {{ $occupancyDays }} days</p>
             <p class="mt-2 text-3xl font-semibold text-stone-900">{{ $stats['occupancy_percent'] === null ? '—' : $stats['occupancy_percent'].'%' }}</p>
             @if ($stats['occupancy_percent'] === null)
                 <p class="mt-1 text-xs text-stone-400">No dates open yet</p>
@@ -51,7 +51,7 @@
 
         <div class="rounded-xl border border-stone-200 bg-white">
             <div class="flex items-center justify-between border-b border-stone-200 px-4 py-3">
-                <p class="font-medium text-stone-900">Moving in this week</p>
+                <p class="font-medium text-stone-900">Starting this week</p>
                 <a href="{{ route('admin.bookings.index', ['status' => 'confirmed']) }}" class="py-1 text-xs text-stone-500 hover:underline">View confirmed</a>
             </div>
             <div class="divide-y divide-stone-100">
@@ -59,12 +59,12 @@
                     <div class="flex items-center justify-between gap-3 px-4 py-3">
                         <div class="min-w-0">
                             <p class="truncate text-sm font-medium text-stone-900">{{ $booking->guest_name }}</p>
-                            <p class="mt-0.5 truncate text-xs text-stone-500">{{ $booking->unit_count }} × {{ $booking->unitType->name }} · {{ $booking->nights() }} nights</p>
+                            <p class="mt-0.5 truncate text-xs text-stone-500">{{ $booking->space_count }} × {{ $booking->spaceType->name }} · {{ $booking->days() }} days</p>
                         </div>
-                        <p class="shrink-0 font-mono text-xs text-stone-600">{{ $booking->check_in->format('D j M') }}</p>
+                        <p class="shrink-0 font-mono text-xs text-stone-600">{{ $booking->start_date->format('D j M') }}</p>
                     </div>
                 @empty
-                    <p class="px-4 py-6 text-center text-sm text-stone-400">Nobody is moving in this week.</p>
+                    <p class="px-4 py-6 text-center text-sm text-stone-400">No event starts this week.</p>
                 @endforelse
             </div>
         </div>
@@ -77,8 +77,8 @@
             <div class="divide-y divide-stone-100">
                 @forelse ($recentBookings as $booking)
                     <div class="px-4 py-3">
-                        <p class="text-sm font-medium text-stone-900">{{ $booking->guest_name }} — {{ $booking->unitType->name }}</p>
-                        <p class="mt-0.5 text-xs text-stone-500">{{ $booking->check_in->toFormattedDateString() }} → {{ $booking->check_out->toFormattedDateString() }} · {{ ucfirst($booking->status) }}</p>
+                        <p class="text-sm font-medium text-stone-900">{{ $booking->guest_name }} — {{ $booking->spaceType->name }}</p>
+                        <p class="mt-0.5 text-xs text-stone-500">{{ $booking->start_date->toFormattedDateString() }} → {{ $booking->end_date->toFormattedDateString() }} · {{ ucfirst($booking->status) }}</p>
                     </div>
                 @empty
                     <p class="px-4 py-6 text-center text-sm text-stone-400">No bookings yet.</p>
@@ -88,6 +88,6 @@
     </div>
 
     <p class="mt-6 font-mono text-[11px] uppercase tracking-[.12em] text-stone-400">
-        {{ $stats['unit_types'] }} unit types · {{ $stats['knowledge_items'] }} knowledge items
+        {{ $stats['space_types'] }} space types · {{ $stats['knowledge_items'] }} knowledge items
     </p>
 </x-admin-layout>

@@ -2,81 +2,95 @@
 
 namespace App\Services\Reservation;
 
-use App\Models\Apartment;
 use App\Models\Booking;
+use App\Models\Venue;
 
 /**
- * Builds the WhatsApp / phone / email hand-over links that carry a
- * reservation summary (or a plain "talk to staff" request) to the apartment team.
+ * Builds the WhatsApp / phone / email hand-over links that carry a booking
+ * summary (or a plain "talk to the team" request) to the venue team.
  */
 class ReservationHandover
 {
     /**
      * @return array{whatsapp_url: ?string, phone_url: ?string, email_url: ?string}
      */
-    public function forBooking(Apartment $apartment, Booking $booking, string $locale): array
+    public function forBooking(Venue $venue, Booking $booking, string $locale): array
     {
         $message = $this->reservationMessage($booking, $locale);
 
-        return $this->links($apartment, $message, $this->subject('reservation', $locale).' '.$booking->reference);
+        return $this->links($venue, $message, $this->subject('reservation', $locale).' '.$booking->reference);
     }
 
     /**
      * @return array{whatsapp_url: ?string, phone_url: ?string, email_url: ?string}
      */
-    public function forStaff(Apartment $apartment, string $locale): array
+    public function forStaff(Venue $venue, string $locale): array
     {
-        return $this->links($apartment, $this->subject('staff_message', $locale), $this->subject('staff', $locale));
+        return $this->links($venue, $this->subject('staff_message', $locale), $this->subject('staff', $locale));
     }
 
     /**
      * @return array{whatsapp_url: ?string, phone_url: ?string, email_url: ?string}
      */
-    private function links(Apartment $apartment, string $message, string $subject): array
+    private function links(Venue $venue, string $message, string $subject): array
     {
-        $whatsapp = preg_replace('/\D+/', '', (string) $apartment->whatsapp);
-        $phone = preg_replace('/[^\d+]/', '', (string) $apartment->phone);
+        $whatsapp = preg_replace('/\D+/', '', (string) $venue->whatsapp);
+        $phone = preg_replace('/[^\d+]/', '', (string) $venue->phone);
 
         return [
             'whatsapp_url' => $whatsapp !== '' ? 'https://wa.me/'.$whatsapp.'?text='.rawurlencode($message) : null,
             'phone_url' => $phone !== '' ? 'tel:'.$phone : null,
-            'email_url' => filled($apartment->email) ? 'mailto:'.$apartment->email.'?subject='.rawurlencode($subject).'&body='.rawurlencode($message) : null,
+            'email_url' => filled($venue->email) ? 'mailto:'.$venue->email.'?subject='.rawurlencode($subject).'&body='.rawurlencode($message) : null,
         ];
     }
 
     private function reservationMessage(Booking $booking, string $locale): string
     {
-        $booking->loadMissing('unitType');
+        $booking->loadMissing('spaceType');
 
         $labels = match ($locale) {
-            'en' => ['Hello, I would like to request a stay at the apartment.', 'Name', 'Move-in', 'Move-out', 'Residents', 'Units', 'Unit type', 'Special request', 'Reference'],
-            'ja' => ['こんにちは。アパートメントの滞在をリクエストしたいです。', 'お名前', '入居日', '退去日', '人数', '戸数', 'お部屋タイプ', 'ご要望', '予約番号'],
-            default => ['Halo, saya ingin mengajukan permintaan sewa unit apartemen.', 'Nama', 'Check-in', 'Check-out', 'Penghuni', 'Jumlah unit', 'Tipe unit', 'Permintaan khusus', 'Referensi'],
+            'en' => ['Hello, I would like to book a space for a recruitment event.', 'Name', 'Company', 'Start date', 'End date', 'Attendees', 'Spaces', 'Space type', 'Special request', 'Reference', 'Event type'],
+            'ja' => ['こんにちは。採用イベントのためにスペースを予約したいです。', 'お名前', '会社名', '開始日', '終了日', '参加人数', 'スペース数', 'スペースタイプ', 'ご要望', '予約番号', 'イベント種別'],
+            default => ['Halo, saya ingin memesan ruang untuk acara rekrutmen.', 'Nama', 'Perusahaan', 'Tanggal mulai', 'Tanggal selesai', 'Peserta', 'Jumlah ruang', 'Tipe ruang', 'Permintaan khusus', 'Referensi', 'Jenis acara'],
         };
 
-        $guests = $booking->adults + $booking->children;
+        $attendees = $booking->candidates + $booking->recruiters;
 
         return implode("\n", [
             $labels[0],
             '',
             "{$labels[1]}: {$booking->guest_name}",
-            "{$labels[2]}: ".$booking->check_in->locale($locale)->translatedFormat('j F Y'),
-            "{$labels[3]}: ".$booking->check_out->locale($locale)->translatedFormat('j F Y'),
-            "{$labels[4]}: {$guests}",
-            "{$labels[5]}: {$booking->unit_count}",
-            "{$labels[6]}: ".$booking->unitType->translatedName($locale),
-            "{$labels[7]}: ".($booking->notes ?: '-'),
+            "{$labels[2]}: ".($booking->company_name ?: '-'),
+            "{$labels[10]}: ".($booking->event_type ? ($this->eventTypeLabel($booking->event_type, $locale)) : '-'),
+            "{$labels[3]}: ".$booking->start_date->locale($locale)->translatedFormat('j F Y'),
+            "{$labels[4]}: ".$booking->end_date->locale($locale)->translatedFormat('j F Y'),
+            "{$labels[5]}: {$attendees}",
+            "{$labels[6]}: {$booking->space_count}",
+            "{$labels[7]}: ".$booking->spaceType->translatedName($locale),
+            "{$labels[8]}: ".($booking->notes ?: '-'),
             '',
-            "{$labels[8]}: {$booking->reference}",
+            "{$labels[9]}: {$booking->reference}",
         ]);
+    }
+
+    /**
+     * Organiser-facing name of an event type, in the organiser's language.
+     */
+    public function eventTypeLabel(string $eventType, string $locale): string
+    {
+        return [
+            'en' => ['job_fair' => 'Job fair', 'walk_in_interview' => 'Walk-in interviews', 'assessment' => 'Assessment & testing', 'briefing' => 'Briefing / talent talk', 'campus_hiring' => 'Campus hiring', 'other' => 'Other'],
+            'ja' => ['job_fair' => '合同説明会・ジョブフェア', 'walk_in_interview' => '来場型面接', 'assessment' => '適性検査・テスト', 'briefing' => '会社説明会', 'campus_hiring' => '新卒採用イベント', 'other' => 'その他'],
+            'id' => ['job_fair' => 'Job fair', 'walk_in_interview' => 'Walk-in interview', 'assessment' => 'Asesmen & tes', 'briefing' => 'Pembekalan / talent talk', 'campus_hiring' => 'Campus hiring', 'other' => 'Lainnya'],
+        ][$locale][$eventType] ?? $eventType;
     }
 
     private function subject(string $key, string $locale): string
     {
         return [
-            'en' => ['reservation' => 'Stay request', 'staff' => 'Question for the apartment team', 'staff_message' => 'Hello, I would like to speak with the apartment team.'],
-            'ja' => ['reservation' => '滞在リクエスト', 'staff' => 'スタッフへのご相談', 'staff_message' => 'こんにちは。アパートメントのスタッフとお話ししたいです。'],
-            'id' => ['reservation' => 'Permintaan sewa unit', 'staff' => 'Pertanyaan untuk tim apartemen', 'staff_message' => 'Halo, saya ingin bicara dengan tim apartemen.'],
+            'en' => ['reservation' => 'Venue booking request', 'staff' => 'Question for the venue team', 'staff_message' => 'Hello, I would like to speak with the venue team.'],
+            'ja' => ['reservation' => '会場予約リクエスト', 'staff' => '会場スタッフへのご相談', 'staff_message' => 'こんにちは。会場のスタッフとお話ししたいです。'],
+            'id' => ['reservation' => 'Permintaan booking venue', 'staff' => 'Pertanyaan untuk tim venue', 'staff_message' => 'Halo, saya ingin bicara dengan tim venue.'],
         ][$locale][$key];
     }
 }

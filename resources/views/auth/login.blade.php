@@ -9,8 +9,8 @@
 </head>
 <body class="flex min-h-screen items-center justify-center bg-stone-50">
     <div class="w-full max-w-sm rounded-xl border border-stone-200 bg-white p-6 shadow-sm">
-        <h1 class="text-lg font-semibold text-stone-900">Apartment Admin</h1>
-        <p class="mt-1 text-sm text-stone-500">Sign in to manage your apartment's AI Concierge.</p>
+        <h1 class="text-lg font-semibold text-stone-900">Recruitment Venue Admin</h1>
+        <p class="mt-1 text-sm text-stone-500">Sign in to manage your recruitment venue and its AI Venue Coordinator.</p>
 
         @if ($errors->any())
             <div class="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
@@ -34,7 +34,7 @@
                 <input type="checkbox" name="remember" class="rounded border-stone-300">
                 Remember me
             </label>
-            <button type="submit" class="w-full rounded-lg bg-stone-900 px-3 py-2 text-sm font-medium text-white hover:bg-stone-700">
+            <button type="submit" class="w-full rounded-lg bg-ink px-3 py-2 text-sm font-medium text-white hover:bg-signal hover:text-signal-ink">
                 Sign in
             </button>
         </form>

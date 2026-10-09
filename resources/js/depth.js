@@ -1,5 +1,5 @@
 /**
- * Gives the stage a sense of depth: the photo, the concierge and the glass
+ * Gives the stage a sense of depth: the photo, the coordinator and the glass
  * panels drift by different amounts as the pointer moves, so she reads as
  * standing in front of the room rather than pasted on it.
  *

@@ -22,6 +22,21 @@
         @case('wifi')
             <path d="M2.5 8.5a14 14 0 0 1 19 0M5.5 12a9.5 9.5 0 0 1 13 0M8.5 15.5a5 5 0 0 1 7 0"/><circle cx="12" cy="19" r="1" fill="currentColor"/>
             @break
+        @case('desk')
+            <rect x="3" y="9" width="18" height="6" rx="1.2"/><path d="M6 15v5M18 15v5M8 9V5.5h8V9M12 12h.01"/>
+            @break
+        @case('lab')
+            <rect x="3" y="4" width="18" height="12" rx="1.4"/><path d="M8 20h8M12 16v4M8.5 10l2.3 2.3L15.5 7.8"/>
+            @break
+        @case('chat')
+            <path d="M4 5.5h11a1.5 1.5 0 0 1 1.5 1.5v6A1.5 1.5 0 0 1 15 14.5H9.5L6 17.5v-3H4A1.5 1.5 0 0 1 2.5 13V7A1.5 1.5 0 0 1 4 5.5Z"/><path d="M18.5 9.5h1.5A1.5 1.5 0 0 1 21.5 11v6.5h-2.5L17 20v-2.5"/>
+            @break
+        @case('screen')
+            <rect x="3" y="4" width="18" height="11" rx="1.2"/><path d="M12 15v4M8 20h8M7.5 9.5h9"/>
+            @break
+        @case('locker')
+            <rect x="4" y="3" width="16" height="18" rx="1.5"/><path d="M12 3v18M9 8h.01M15 8h.01M9 13h.01M15 13h.01"/>
+            @break
         @case('laundry')
             <rect x="4.5" y="3" width="15" height="18" rx="1.5"/><path d="M4.5 7.5h15M7.5 5.3h.01M10 5.3h.01"/><circle cx="12" cy="14" r="4"/><path d="M9.5 14.5c1-.8 2-.8 3 0s2 .8 2.5 0"/>
             @break

@@ -1,5 +1,5 @@
 /**
- * The AI concierge introducing a scene: types the intro like speech, animates
+ * The AI coordinator introducing a scene: types the intro like speech, animates
  * the avatar and sound bars while "speaking", and can read it aloud with the
  * browser's speech synthesis when the guest asks (never automatically).
  * The full text is always in the DOM for screen readers and no-JS visitors.

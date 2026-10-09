@@ -13,7 +13,7 @@ return new class extends Migration
             $table->foreignId('conversation_id')->constrained()->cascadeOnDelete();
             $table->string('role'); // guest | assistant | staff | system
             $table->text('content')->nullable();
-            $table->json('ui_payload')->nullable(); // unit cards, images, actions rendered to the guest
+            $table->json('ui_payload')->nullable(); // space cards, images, actions rendered to the guest
             $table->json('tool_calls')->nullable();
             $table->timestamps();
         });

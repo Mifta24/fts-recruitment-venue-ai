@@ -2,18 +2,18 @@
 
 namespace Tests\Feature;
 
-use App\Models\Apartment;
 use App\Models\Booking;
 use App\Models\Conversation;
 use App\Models\HandoverRequest;
-use App\Models\UnitInventory;
-use App\Models\UnitType;
+use App\Models\SpaceInventory;
+use App\Models\SpaceType;
 use App\Models\User;
+use App\Models\Venue;
 use App\Notifications\BookingRequestReceived;
 use App\Notifications\BookingStatusChanged;
 use App\Notifications\NewBookingRequest;
 use App\Notifications\NewHandoverRequest;
-use App\Services\Concierge\ApartmentConciergeTools;
+use App\Services\Coordinator\VenueCoordinatorTools;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Notifications\AnonymousNotifiable;
@@ -25,31 +25,31 @@ class StaffAndGuestNotificationTest extends TestCase
 {
     use RefreshDatabase;
 
-    private Apartment $apartment;
+    private Venue $venue;
 
-    private UnitType $unitType;
+    private SpaceType $spaceType;
 
     private User $owner;
 
     private User $inactiveStaff;
 
-    private CarbonImmutable $checkIn;
+    private CarbonImmutable $startDate;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->apartment = Apartment::create(['name' => 'Demo', 'slug' => 'demo', 'public_status' => 'published', 'currency' => 'IDR', 'default_locale' => 'en']);
-        $this->unitType = $this->apartment->unitTypes()->create(['name' => 'Studio', 'slug' => 'studio', 'translations' => ['ja' => ['name' => 'スタジオ']], 'base_price' => 500000, 'max_adults' => 2, 'max_children' => 0, 'is_active' => true]);
+        $this->venue = Venue::create(['name' => 'Demo', 'slug' => 'demo', 'public_status' => 'published', 'currency' => 'IDR', 'default_locale' => 'en']);
+        $this->spaceType = $this->venue->spaceTypes()->create(['name' => 'Studio', 'slug' => 'studio', 'translations' => ['ja' => ['name' => 'スタジオ']], 'base_price' => 500000, 'max_candidates' => 2, 'max_recruiters' => 0, 'is_active' => true]);
 
         $this->owner = User::factory()->create();
         $this->inactiveStaff = User::factory()->create();
-        $this->apartment->users()->attach($this->owner->id, ['role' => 'owner', 'status' => 'active']);
-        $this->apartment->users()->attach($this->inactiveStaff->id, ['role' => 'staff', 'status' => 'suspended']);
+        $this->venue->users()->attach($this->owner->id, ['role' => 'owner', 'status' => 'active']);
+        $this->venue->users()->attach($this->inactiveStaff->id, ['role' => 'staff', 'status' => 'suspended']);
 
-        $this->checkIn = CarbonImmutable::now($this->apartment->timezone)->addDays(5)->startOfDay();
+        $this->startDate = CarbonImmutable::now($this->venue->timezone)->addDays(5)->startOfDay();
         foreach ([0, 1] as $offset) {
-            UnitInventory::create(['unit_type_id' => $this->unitType->id, 'stay_date' => $this->checkIn->addDays($offset)->toDateString(), 'total_units' => 2, 'booked_units' => 0, 'price' => 500000]);
+            SpaceInventory::create(['space_type_id' => $this->spaceType->id, 'event_date' => $this->startDate->addDays($offset)->toDateString(), 'total_spaces' => 2, 'booked_spaces' => 0, 'price' => 500000]);
         }
     }
 
@@ -60,13 +60,13 @@ class StaffAndGuestNotificationTest extends TestCase
     private function reservation(array $overrides = []): array
     {
         return [
-            'unit_type_slug' => 'studio', 'check_in' => $this->checkIn->toDateString(), 'check_out' => $this->checkIn->addDays(2)->toDateString(),
-            'adults' => 2, 'units' => 1, 'locale' => 'id', 'guest_name' => 'Ayu', 'contact_type' => 'email', 'contact_value' => 'ayu@example.test',
+            'space_type_slug' => 'studio', 'start_date' => $this->startDate->toDateString(), 'end_date' => $this->startDate->addDays(1)->toDateString(),
+            'candidates' => 2, 'spaces' => 1, 'locale' => 'id', 'guest_name' => 'Ayu', 'company_name' => 'PT Maju', 'contact_type' => 'email', 'contact_value' => 'ayu@example.test',
             ...$overrides,
         ];
     }
 
-    public function test_a_stay_request_notifies_active_staff_and_acknowledges_a_guest_who_left_an_email(): void
+    public function test_a_booking_request_notifies_active_staff_and_acknowledges_an_organiser_who_left_an_email(): void
     {
         Notification::fake();
 
@@ -90,23 +90,23 @@ class StaffAndGuestNotificationTest extends TestCase
         Notification::assertSentOnDemandTimes(BookingRequestReceived::class, 0);
     }
 
-    public function test_a_request_that_finds_no_free_unit_notifies_nobody(): void
+    public function test_a_request_that_finds_no_free_space_notifies_nobody(): void
     {
         Notification::fake();
 
-        $this->postJson('/demo/reservation', $this->reservation(['units' => 3, 'adults' => 6]))->assertUnprocessable();
+        $this->postJson('/demo/reservation', $this->reservation(['spaces' => 3, 'candidates' => 6]))->assertUnprocessable();
 
         Notification::assertNothingSent();
     }
 
-    public function test_the_concierge_booking_tool_notifies_staff_and_remembers_the_guest_language(): void
+    public function test_the_coordinator_booking_tool_notifies_staff_and_remembers_the_guest_language(): void
     {
         Notification::fake();
-        $conversation = Conversation::create(['apartment_id' => $this->apartment->id, 'guest_token' => (string) Str::uuid(), 'locale' => 'ja']);
+        $conversation = Conversation::create(['venue_id' => $this->venue->id, 'guest_token' => (string) Str::uuid(), 'locale' => 'ja']);
 
-        (new ApartmentConciergeTools($this->apartment, $conversation, 'ja'))->dispatch('create_booking_request', [
-            'unit_type_slug' => 'studio', 'check_in' => $this->checkIn->toDateString(), 'check_out' => $this->checkIn->addDays(2)->toDateString(),
-            'adults' => 2, 'guest_name' => 'Aki', 'guest_phone' => '+81 90 0000 0000', 'guest_email' => 'aki@example.test',
+        (new VenueCoordinatorTools($this->venue, $conversation, 'ja'))->dispatch('create_booking_request', [
+            'space_type_slug' => 'studio', 'start_date' => $this->startDate->toDateString(), 'end_date' => $this->startDate->addDays(1)->toDateString(),
+            'candidates' => 2, 'guest_name' => 'Aki', 'company_name' => 'Aki KK', 'guest_phone' => '+81 90 0000 0000', 'guest_email' => 'aki@example.test',
         ]);
 
         Notification::assertSentTo($this->owner, NewBookingRequest::class);
@@ -117,36 +117,36 @@ class StaffAndGuestNotificationTest extends TestCase
     public function test_a_handover_notifies_active_staff_with_a_link_to_the_conversation(): void
     {
         Notification::fake();
-        $conversation = Conversation::create(['apartment_id' => $this->apartment->id, 'guest_token' => (string) Str::uuid(), 'locale' => 'en']);
+        $conversation = Conversation::create(['venue_id' => $this->venue->id, 'guest_token' => (string) Str::uuid(), 'locale' => 'en']);
 
-        (new ApartmentConciergeTools($this->apartment, $conversation, 'en'))->dispatch('request_human_handover', ['reason' => HandoverRequest::REASON_COMPLAINT, 'summary' => 'Noisy neighbours']);
+        (new VenueCoordinatorTools($this->venue, $conversation, 'en'))->dispatch('request_human_handover', ['reason' => HandoverRequest::REASON_COMPLAINT, 'summary' => 'Custom stage branding']);
 
         $handover = HandoverRequest::firstOrFail();
         Notification::assertSentTo($this->owner, NewHandoverRequest::class, fn ($notification) => $notification->handover->is($handover));
         Notification::assertNotSentTo($this->inactiveStaff, NewHandoverRequest::class);
 
         $mail = (new NewHandoverRequest($handover))->toMail($this->owner);
-        $this->assertStringContainsString('Noisy neighbours', implode(' ', $mail->introLines));
+        $this->assertStringContainsString('Custom stage branding', implode(' ', $mail->introLines));
         $this->assertSame(route('admin.handovers.show', $handover), $mail->actionUrl);
     }
 
     public function test_the_guest_emails_are_written_in_the_language_the_guest_used(): void
     {
         $booking = Booking::create([
-            'reference' => 'BK-TEST01', 'apartment_id' => $this->apartment->id, 'unit_type_id' => $this->unitType->id, 'guest_name' => 'Aki',
-            'guest_email' => 'aki@example.test', 'adults' => 2, 'unit_count' => 1, 'check_in' => $this->checkIn, 'check_out' => $this->checkIn->addDays(2), 'total_price' => 1000000,
+            'reference' => 'BK-TEST01', 'venue_id' => $this->venue->id, 'space_type_id' => $this->spaceType->id, 'guest_name' => 'Aki',
+            'guest_email' => 'aki@example.test', 'candidates' => 2, 'space_count' => 1, 'start_date' => $this->startDate, 'end_date' => $this->startDate->addDays(1), 'total_price' => 1000000,
             'status' => Booking::STATUS_CONFIRMED, 'locale' => 'ja',
         ]);
 
         $confirmed = (new BookingStatusChanged($booking))->toMail(new AnonymousNotifiable);
-        $this->assertSame('ご入居が確定しました BK-TEST01', $confirmed->subject);
-        $this->assertContains('お部屋: 1 × スタジオ', $confirmed->introLines);
-        $this->assertContains('入居日: '.$this->checkIn->year.'年'.$this->checkIn->month.'月'.$this->checkIn->day.'日', $confirmed->introLines);
+        $this->assertSame('会場のご予約が確定しました BK-TEST01', $confirmed->subject);
+        $this->assertContains('スペース: 1 × スタジオ', $confirmed->introLines);
+        $this->assertContains('開始日: '.$this->startDate->year.'年'.$this->startDate->month.'月'.$this->startDate->day.'日', $confirmed->introLines);
 
         $booking->update(['status' => Booking::STATUS_CANCELLED, 'locale' => 'id']);
-        $this->assertSame('Permintaan sewa BK-TEST01 dibatalkan', (new BookingStatusChanged($booking))->toMail(new AnonymousNotifiable)->subject);
+        $this->assertSame('Permintaan booking venue BK-TEST01 dibatalkan', (new BookingStatusChanged($booking))->toMail(new AnonymousNotifiable)->subject);
 
         $booking->update(['locale' => null]);
-        $this->assertSame('Your stay request BK-TEST01 was cancelled', (new BookingStatusChanged($booking))->toMail(new AnonymousNotifiable)->subject);
+        $this->assertSame('Your venue booking request BK-TEST01 was cancelled', (new BookingStatusChanged($booking))->toMail(new AnonymousNotifiable)->subject);
     }
 }

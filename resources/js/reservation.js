@@ -1,8 +1,8 @@
 import { createDatePicker } from './date-picker';
 
 /**
- * Guided stay request wizard: five short steps on the leasing floor — dates,
- * residents, unit, contact, summary — then a reference number and
+ * Guided venue booking wizard: five short steps on the booking step — dates,
+ * crowd, space, organiser details, summary — then a reference number and
  * WhatsApp / phone / email hand-over. Progress survives leaving the page and
  * switching language (sessionStorage), and every rule is enforced again on the
  * server, which is the only source of price and availability.
@@ -18,15 +18,15 @@ function initReservationWizard() {
     const steps = [...root.querySelectorAll('[data-step]')];
     const progress = [...root.querySelectorAll('[data-progress-step]')];
     const stepLabel = root.querySelector('[data-wizard-step-label]');
-    const nightsHint = root.querySelector('[data-nights-hint]');
+    const daysHint = root.querySelector('[data-days-hint]');
     const backButton = root.querySelector('[data-wizard-back]');
     const nextButton = root.querySelector('[data-wizard-next]');
     const submitButton = root.querySelector('[data-wizard-submit]');
     const errorBox = root.querySelector('[data-wizard-error]');
     const errorText = root.querySelector('[data-wizard-error-text]');
     const alternativesBox = root.querySelector('[data-wizard-alternatives]');
-    const unitOptions = [...root.querySelectorAll('[data-unit-option]')];
-    const extraBedField = root.querySelector('[data-extra-bed-field]');
+    const spaceOptions = [...root.querySelectorAll('[data-space-option]')];
+    const techCrewField = root.querySelector('[data-tech-crew-field]');
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
 
     const config = {
@@ -35,14 +35,14 @@ function initReservationWizard() {
         locale: root.dataset.locale,
         currency: root.dataset.currency,
         today: root.dataset.today,
-        maxNights: Number(root.dataset.maxNights),
-        draftKey: `reservation_draft_${root.dataset.apartmentSlug}`,
-        tokenKey: `concierge_token_${root.dataset.apartmentSlug}`,
+        maxDays: Number(root.dataset.maxDays),
+        draftKey: `reservation_draft_${root.dataset.venueSlug}`,
+        tokenKey: `coordinator_token_${root.dataset.venueSlug}`,
     };
 
     const fieldStep = {
-        check_in: 1, check_out: 1, adults: 2, children: 2, units: 2, unit_type_slug: 3, extra_bed: 3,
-        guest_name: 4, contact_type: 4, contact_value: 4, special_request: 4,
+        start_date: 1, end_date: 1, candidates: 2, recruiters: 2, spaces: 2, space_type_slug: 3, tech_crew: 3,
+        guest_name: 4, company_name: 4, event_type: 4, contact_type: 4, contact_value: 4, special_request: 4,
     };
 
     let current = 1;
@@ -59,8 +59,8 @@ function initReservationWizard() {
 
     const datePicker = createDatePicker({
         root: root.querySelector('[data-date-picker]'),
-        checkIn: form.elements.check_in,
-        checkOut: form.elements.check_out,
+        startDate: form.elements.start_date,
+        endDate: form.elements.end_date,
         config,
         labels,
         formatDate,
@@ -70,24 +70,26 @@ function initReservationWizard() {
         },
     });
 
-    function nightsBetween(checkIn, checkOut) {
-        if (!checkIn || !checkOut) return 0;
-        const [y1, m1, d1] = checkIn.split('-').map(Number);
-        const [y2, m2, d2] = checkOut.split('-').map(Number);
-        return Math.round((Date.UTC(y2, m2 - 1, d2) - Date.UTC(y1, m1 - 1, d1)) / 86400000);
+    function daysBetween(startDate, endDate) {
+        if (!startDate || !endDate) return 0;
+        const [y1, m1, d1] = startDate.split('-').map(Number);
+        const [y2, m2, d2] = endDate.split('-').map(Number);
+        return Math.round((Date.UTC(y2, m2 - 1, d2) - Date.UTC(y1, m1 - 1, d1)) / 86400000) + 1;
     }
 
     function values() {
         const data = new FormData(form);
         return {
-            check_in: data.get('check_in') || '',
-            check_out: data.get('check_out') || '',
-            adults: Number(data.get('adults')) || 0,
-            children: Number(data.get('children')) || 0,
-            units: Number(data.get('units')) || 0,
-            unit_type_slug: data.get('unit_type_slug') || '',
-            extra_bed: form.elements.extra_bed.checked && !extraBedField.hidden,
+            start_date: data.get('start_date') || '',
+            end_date: data.get('end_date') || '',
+            candidates: Number(data.get('candidates')) || 0,
+            recruiters: Number(data.get('recruiters')) || 0,
+            spaces: Number(data.get('spaces')) || 0,
+            space_type_slug: data.get('space_type_slug') || '',
+            tech_crew: form.elements.tech_crew.checked && !techCrewField.hidden,
             guest_name: (data.get('guest_name') || '').trim(),
+            company_name: (data.get('company_name') || '').trim(),
+            event_type: data.get('event_type') || 'other',
             contact_type: data.get('contact_type') || 'whatsapp',
             contact_value: (data.get('contact_value') || '').trim(),
             special_request: (data.get('special_request') || '').trim(),
@@ -111,13 +113,14 @@ function initReservationWizard() {
             const draft = JSON.parse(sessionStorage.getItem(config.draftKey) || 'null');
             if (!draft) return;
             const { values: saved } = draft;
-            ['check_in', 'check_out', 'adults', 'children', 'units', 'guest_name', 'contact_value', 'special_request'].forEach((name) => {
+            ['start_date', 'end_date', 'candidates', 'recruiters', 'spaces', 'guest_name', 'company_name', 'contact_value', 'special_request'].forEach((name) => {
                 if (saved[name] !== undefined && saved[name] !== '' && saved[name] !== 0) form.elements[name].value = saved[name];
             });
-            if (saved.children === 0) form.elements.children.value = 0;
+            if (saved.recruiters === 0) form.elements.recruiters.value = 0;
             if (saved.contact_type) form.elements.contact_type.value = saved.contact_type;
-            if (saved.unit_type_slug) form.elements.unit_type_slug.value = saved.unit_type_slug;
-            form.elements.extra_bed.checked = Boolean(saved.extra_bed);
+            if (saved.event_type) form.elements.event_type.value = saved.event_type;
+            if (saved.space_type_slug) form.elements.space_type_slug.value = saved.space_type_slug;
+            form.elements.tech_crew.checked = Boolean(saved.tech_crew);
             current = Math.min(Math.max(Number(draft.step) || 1, 1), steps.length);
         } catch { /* ignore a corrupt draft */ }
     }
@@ -142,8 +145,8 @@ function initReservationWizard() {
             button.className = 'wizard-secondary';
             button.textContent = `${alternative.name} · ${money(alternative.total)}`;
             button.addEventListener('click', () => {
-                form.elements.unit_type_slug.value = alternative.slug;
-                refreshUnits();
+                form.elements.space_type_slug.value = alternative.slug;
+                refreshSpaces();
                 clearError();
                 saveDraft();
             });
@@ -154,65 +157,66 @@ function initReservationWizard() {
     }
 
     function selectedOption() {
-        const slug = form.elements.unit_type_slug.value;
-        return unitOptions.find((option) => option.querySelector('input').value === slug) || null;
+        const slug = form.elements.space_type_slug.value;
+        return spaceOptions.find((option) => option.querySelector('input').value === slug) || null;
     }
 
     function fits(option, party) {
-        return party.adults <= Number(option.dataset.maxAdults) * party.units
-            && party.adults + party.children <= Number(option.dataset.maxOccupancy) * party.units;
+        return party.candidates <= Number(option.dataset.maxCandidates) * party.spaces
+            && party.candidates + party.recruiters <= Number(option.dataset.maxCapacity) * party.spaces;
     }
 
-    function refreshUnits() {
+    function refreshSpaces() {
         const party = values();
 
-        unitOptions.forEach((option) => {
+        spaceOptions.forEach((option) => {
             const input = option.querySelector('input');
             const suitable = fits(option, party);
             input.disabled = !suitable;
             option.classList.toggle('is-disabled', !suitable);
-            option.querySelector('[data-unit-hint]').textContent = suitable ? '' : labels.too_small;
+            option.querySelector('[data-space-hint]').textContent = suitable ? '' : labels.too_small;
             if (!suitable && input.checked) input.checked = false;
         });
 
         const chosen = selectedOption();
-        extraBedField.hidden = !chosen || chosen.dataset.extraBed !== '1';
-        if (extraBedField.hidden) form.elements.extra_bed.checked = false;
+        techCrewField.hidden = !chosen || chosen.dataset.techCrew !== '1';
+        if (techCrewField.hidden) form.elements.tech_crew.checked = false;
     }
 
-    function refreshNights() {
-        const checkIn = form.elements.check_in.value;
-        const nights = nightsBetween(checkIn, form.elements.check_out.value);
+    function refreshDays() {
+        const startDate = form.elements.start_date.value;
+        const days = daysBetween(startDate, form.elements.end_date.value);
 
-        if (nights > 0) nightsHint.textContent = `${nights} ${labels.nights}`;
-        else if (!datePicker.hasOpenNights) nightsHint.textContent = labels.cal_none;
-        else nightsHint.textContent = checkIn ? labels.cal_pick_out : labels.cal_pick_in;
+        if (days > 0) daysHint.textContent = `${days} ${labels.days}`;
+        else if (!datePicker.hasOpenDays) daysHint.textContent = labels.cal_none;
+        else daysHint.textContent = startDate ? labels.cal_pick_end : labels.cal_pick_start;
     }
 
     function validate(step) {
         const data = values();
 
         if (step === 1) {
-            if (!data.check_in) return { field: 'check_in', message: labels.cal_pick_in };
-            if (data.check_in < config.today) return { field: 'check_in', message: labels.check_in_past };
-            if (!data.check_out) return { field: 'check_out', message: labels.cal_pick_out };
-            if (data.check_out <= data.check_in) return { field: 'check_out', message: labels.check_out_after };
-            if (nightsBetween(data.check_in, data.check_out) > config.maxNights) return { field: 'check_out', message: text(labels.too_long, { max: config.maxNights }) };
+            if (!data.start_date) return { field: 'start_date', message: labels.cal_pick_start };
+            if (data.start_date < config.today) return { field: 'start_date', message: labels.start_date_past };
+            if (!data.end_date) return { field: 'end_date', message: labels.cal_pick_end };
+            if (data.end_date < data.start_date) return { field: 'end_date', message: labels.end_date_after };
+            if (daysBetween(data.start_date, data.end_date) > config.maxDays) return { field: 'end_date', message: text(labels.too_long, { max: config.maxDays }) };
         }
 
         if (step === 2) {
-            if (data.adults < 1) return { field: 'adults', message: labels.invalid };
-            if (data.units < 1) return { field: 'units', message: labels.invalid };
+            if (data.candidates < 1) return { field: 'candidates', message: labels.invalid };
+            if (data.spaces < 1) return { field: 'spaces', message: labels.invalid };
         }
 
         if (step === 3) {
             const chosen = selectedOption();
-            if (!chosen) return { field: 'unit_type_slug', message: labels.select_unit };
-            if (!fits(chosen, data)) return { field: 'unit_type_slug', message: labels.too_small };
+            if (!chosen) return { field: 'space_type_slug', message: labels.select_space };
+            if (!fits(chosen, data)) return { field: 'space_type_slug', message: labels.too_small };
         }
 
         if (step === 4) {
             if (!data.guest_name) return { field: 'guest_name', message: labels.invalid };
+            if (!data.company_name) return { field: 'company_name', message: labels.invalid };
             const valid = data.contact_type === 'email'
                 ? /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.contact_value)
                 : /^\+?[0-9\s\-().]{6,20}$/.test(data.contact_value);
@@ -243,8 +247,8 @@ function initReservationWizard() {
         nextButton.hidden = step === steps.length;
         submitButton.hidden = step !== steps.length;
 
-        if (step === 2 || step === 3) refreshUnits();
-        if (step === 3 && unitOptions.every((option) => option.classList.contains('is-disabled'))) showError(labels.capacity);
+        if (step === 2 || step === 3) refreshSpaces();
+        if (step === 3 && spaceOptions.every((option) => option.classList.contains('is-disabled'))) showError(labels.capacity);
         if (step === steps.length) renderSummary();
         if (focus) steps[step - 1].querySelector('input:not([type="hidden"]):not([disabled]), textarea, [data-cal-focus]')?.focus({ preventScroll: true });
         saveDraft();
@@ -264,9 +268,9 @@ function initReservationWizard() {
         return { ok: response.ok, status: response.status, body };
     }
 
-    function stayPayload() {
-        const { check_in, check_out, adults, children, units, unit_type_slug, extra_bed } = values();
-        return { check_in, check_out, adults, children, units, unit_type_slug, extra_bed, locale: config.locale };
+    function eventPayload() {
+        const { start_date, end_date, candidates, recruiters, spaces, space_type_slug, tech_crew } = values();
+        return { start_date, end_date, candidates, recruiters, spaces, space_type_slug, tech_crew, locale: config.locale };
     }
 
     function handleFailure(result) {
@@ -293,7 +297,7 @@ function initReservationWizard() {
         if (current === 3) {
             setBusy(true, labels.checking);
             try {
-                const result = await post(config.quoteUrl, stayPayload());
+                const result = await post(config.quoteUrl, eventPayload());
                 if (!result.ok) {
                     handleFailure(result);
                     return;
@@ -329,16 +333,16 @@ function initReservationWizard() {
     function renderSummary() {
         const data = values();
         const chosen = selectedOption();
-        const nights = nightsBetween(data.check_in, data.check_out);
-        const guests = [`${data.adults} ${labels.adults.toLowerCase()}`];
-        if (data.children > 0) guests.push(`${data.children} ${labels.children.toLowerCase()}`);
+        const days = daysBetween(data.start_date, data.end_date);
+        const guests = [`${data.candidates} ${labels.candidates.toLowerCase()}`];
+        if (data.recruiters > 0) guests.push(`${data.recruiters} ${labels.recruiters.toLowerCase()}`);
 
-        const unit = `${chosen ? chosen.dataset.name : ''}${data.extra_bed ? ` + ${labels.extra_bed.toLowerCase()}` : ''}`;
+        const space = `${chosen ? chosen.dataset.name : ''}${data.tech_crew ? ` + ${labels.tech_crew.toLowerCase()}` : ''}`;
         const rows = [
-            summaryRow(labels.dates, `${formatDate(data.check_in)} → ${formatDate(data.check_out)} (${nights} ${labels.nights})`, 1),
-            summaryRow(labels.guests, `${guests.join(', ')} · ${labels.units}: ${data.units}`, 2),
-            summaryRow(labels.unit, unit, 3),
-            summaryRow(labels.contact, `${data.guest_name} · ${labels[data.contact_type]}: ${data.contact_value}`, 4),
+            summaryRow(labels.dates, `${formatDate(data.start_date)} → ${formatDate(data.end_date)} (${days} ${labels.days})`, 1),
+            summaryRow(labels.attendees, `${guests.join(', ')} · ${labels.spaces}: ${data.spaces}`, 2),
+            summaryRow(labels.space, space, 3),
+            summaryRow(labels.organizer, `${data.guest_name}, ${data.company_name} · ${labels.event_types[data.event_type] || ''} · ${labels[data.contact_type]}: ${data.contact_value}`, 4),
         ];
         if (data.special_request) rows.push(summaryRow(labels.special, data.special_request, 4));
 
@@ -384,8 +388,10 @@ function initReservationWizard() {
 
         try {
             const result = await post(config.submitUrl, {
-                ...stayPayload(),
+                ...eventPayload(),
                 guest_name: values().guest_name,
+                company_name: values().company_name,
+                event_type: values().event_type,
                 contact_type: values().contact_type,
                 contact_value: values().contact_value,
                 special_request: values().special_request,
@@ -415,24 +421,24 @@ function initReservationWizard() {
         done.hidden = true;
         flow.hidden = false;
         clearDraft();
-        refreshNights();
+        refreshDays();
         showStep(1, true);
     }
 
     function preselect(slug) {
         if (!flow.hidden) {
-            refreshUnits();
-            const option = unitOptions.find((candidate) => candidate.querySelector('input').value === slug);
+            refreshSpaces();
+            const option = spaceOptions.find((candidate) => candidate.querySelector('input').value === slug);
             if (option && !option.querySelector('input').disabled) {
-                form.elements.unit_type_slug.value = slug;
-                refreshUnits();
+                form.elements.space_type_slug.value = slug;
+                refreshSpaces();
                 saveDraft();
             }
         }
     }
 
-    form.addEventListener('input', () => { refreshNights(); if (current <= 3) refreshUnits(); saveDraft(); });
-    form.addEventListener('change', () => { refreshUnits(); saveDraft(); });
+    form.addEventListener('input', () => { refreshDays(); if (current <= 3) refreshSpaces(); saveDraft(); });
+    form.addEventListener('change', () => { refreshSpaces(); saveDraft(); });
     form.addEventListener('submit', submit);
     nextButton.addEventListener('click', next);
     backButton.addEventListener('click', () => { clearError(); showStep(Math.max(1, current - 1), true); });
@@ -446,21 +452,21 @@ function initReservationWizard() {
 
     restoreDraft();
     datePicker.show();
-    refreshNights();
+    refreshDays();
 
     if (root.dataset.availabilityUrl) {
         fetch(root.dataset.availabilityUrl, { headers: { Accept: 'application/json' } })
             .then((response) => (response.ok ? response.json() : Promise.reject(new Error('availability unavailable'))))
             .then((availability) => {
                 datePicker.setAvailability(availability.dates);
-                refreshNights();
+                refreshDays();
             })
-            .catch(() => { /* the server still checks every night when the guest continues */ });
+            .catch(() => { /* the server still checks every day when the guest continues */ });
     }
 
-    refreshUnits();
+    refreshSpaces();
     showStep(current);
-    preselect(root.dataset.preselectUnit || '');
+    preselect(root.dataset.preselectSpace || '');
 }
 
 document.addEventListener('DOMContentLoaded', initReservationWizard);

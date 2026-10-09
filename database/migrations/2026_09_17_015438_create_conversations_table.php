@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('conversations', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('apartment_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('venue_id')->constrained()->cascadeOnDelete();
             $table->uuid('guest_token')->unique();
             $table->string('guest_name')->nullable();
             $table->string('guest_email')->nullable();

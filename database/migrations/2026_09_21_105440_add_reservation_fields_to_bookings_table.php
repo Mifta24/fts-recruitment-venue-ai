@@ -11,7 +11,7 @@ return new class extends Migration
     {
         Schema::table('bookings', function (Blueprint $table) {
             $table->string('reference', 20)->nullable()->unique()->after('id');
-            $table->unsignedTinyInteger('unit_count')->default(1)->after('children');
+            $table->unsignedTinyInteger('space_count')->default(1)->after('recruiters');
             $table->string('contact_type', 20)->nullable()->after('guest_phone'); // whatsapp | phone | email
         });
 
@@ -26,7 +26,7 @@ return new class extends Migration
     {
         Schema::table('bookings', function (Blueprint $table) {
             $table->dropUnique(['reference']);
-            $table->dropColumn(['reference', 'unit_count', 'contact_type']);
+            $table->dropColumn(['reference', 'space_count', 'contact_type']);
         });
     }
 };

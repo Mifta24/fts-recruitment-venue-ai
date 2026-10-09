@@ -20,7 +20,7 @@ class HandoverRequest extends Model
 
     public const REASON_COMPLAINT = 'complaint';
 
-    public const REASON_GROUP_BOOKING = 'group_booking';
+    public const REASON_CUSTOM_SETUP = 'custom_setup';
 
     public const REASON_NEGOTIATED_RATE = 'negotiated_rate';
 

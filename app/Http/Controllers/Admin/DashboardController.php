@@ -2,17 +2,17 @@
 
 namespace App\Http\Controllers\Admin;
 
-use App\Http\Controllers\Concerns\ResolvesCurrentApartment;
+use App\Http\Controllers\Concerns\ResolvesCurrentVenue;
 use App\Http\Controllers\Controller;
 use App\Models\Booking;
 use App\Models\HandoverRequest;
-use App\Models\UnitInventory;
+use App\Models\SpaceInventory;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class DashboardController extends Controller
 {
-    use ResolvesCurrentApartment;
+    use ResolvesCurrentVenue;
 
     /** How far ahead the occupancy figure looks. */
     private const OCCUPANCY_DAYS = 30;
@@ -20,51 +20,51 @@ class DashboardController extends Controller
     /** How far ahead confirmed move-ins are listed. */
     private const ARRIVAL_DAYS = 7;
 
-    /** A pending request older than this counts as a guest left waiting. */
+    /** A pending request older than this counts as an organiser left waiting. */
     private const WAITING_HOURS = 24;
 
     public function index(Request $request): View
     {
-        $apartment = $this->currentApartment($request);
+        $venue = $this->currentVenue($request);
 
-        $today = now($apartment->timezone)->startOfDay();
+        $today = now($venue->timezone)->startOfDay();
 
-        $occupancy = UnitInventory::whereIn('unit_type_id', $apartment->unitTypes()->where('is_active', true)->select('id'))
-            ->whereDate('stay_date', '>=', $today->toDateString())
-            ->whereDate('stay_date', '<=', $today->copy()->addDays(self::OCCUPANCY_DAYS - 1)->toDateString())
-            ->selectRaw('SUM(total_units) as total, SUM(booked_units) as booked')
+        $occupancy = SpaceInventory::whereIn('space_type_id', $venue->spaceTypes()->where('is_active', true)->select('id'))
+            ->whereDate('event_date', '>=', $today->toDateString())
+            ->whereDate('event_date', '<=', $today->copy()->addDays(self::OCCUPANCY_DAYS - 1)->toDateString())
+            ->selectRaw('SUM(total_spaces) as total, SUM(booked_spaces) as booked')
             ->first();
 
         $stats = [
-            'unit_types' => $apartment->unitTypes()->count(),
-            'knowledge_items' => $apartment->knowledgeItems()->count(),
-            'pending_bookings' => $apartment->bookings()->where('status', Booking::STATUS_PENDING)->count(),
-            'waiting_bookings' => $apartment->bookings()
+            'space_types' => $venue->spaceTypes()->count(),
+            'knowledge_items' => $venue->knowledgeItems()->count(),
+            'pending_bookings' => $venue->bookings()->where('status', Booking::STATUS_PENDING)->count(),
+            'waiting_bookings' => $venue->bookings()
                 ->where('status', Booking::STATUS_PENDING)
                 ->where('created_at', '<', now()->subHours(self::WAITING_HOURS))
                 ->count(),
-            'arrivals' => $apartment->bookings()
+            'arrivals' => $venue->bookings()
                 ->where('status', Booking::STATUS_CONFIRMED)
-                ->whereDate('check_in', '>=', $today->toDateString())
-                ->whereDate('check_in', '<=', $today->copy()->addDays(self::ARRIVAL_DAYS - 1)->toDateString())
+                ->whereDate('start_date', '>=', $today->toDateString())
+                ->whereDate('start_date', '<=', $today->copy()->addDays(self::ARRIVAL_DAYS - 1)->toDateString())
                 ->count(),
             'occupancy_percent' => $occupancy?->total > 0 ? (int) round($occupancy->booked / $occupancy->total * 100) : null,
-            'open_handovers' => HandoverRequest::whereHas('conversation', fn ($q) => $q->where('apartment_id', $apartment->id))
+            'open_handovers' => HandoverRequest::whereHas('conversation', fn ($q) => $q->where('venue_id', $venue->id))
                 ->where('status', HandoverRequest::STATUS_OPEN)
                 ->count(),
         ];
 
-        $arrivals = $apartment->bookings()
+        $arrivals = $venue->bookings()
             ->where('status', Booking::STATUS_CONFIRMED)
-            ->whereDate('check_in', '>=', $today->toDateString())
-            ->whereDate('check_in', '<=', $today->copy()->addDays(self::ARRIVAL_DAYS - 1)->toDateString())
-            ->with('unitType')
-            ->orderBy('check_in')
+            ->whereDate('start_date', '>=', $today->toDateString())
+            ->whereDate('start_date', '<=', $today->copy()->addDays(self::ARRIVAL_DAYS - 1)->toDateString())
+            ->with('spaceType')
+            ->orderBy('start_date')
             ->get();
 
-        $recentBookings = $apartment->bookings()->latest()->take(5)->with('unitType')->get();
+        $recentBookings = $venue->bookings()->latest()->take(5)->with('spaceType')->get();
 
-        $openHandovers = HandoverRequest::whereHas('conversation', fn ($q) => $q->where('apartment_id', $apartment->id))
+        $openHandovers = HandoverRequest::whereHas('conversation', fn ($q) => $q->where('venue_id', $venue->id))
             ->where('status', HandoverRequest::STATUS_OPEN)
             ->latest()
             ->take(5)
@@ -72,7 +72,7 @@ class DashboardController extends Controller
             ->get();
 
         return view('admin.dashboard', [
-            'apartment' => $apartment,
+            'venue' => $venue,
             'stats' => $stats,
             'arrivals' => $arrivals,
             'recentBookings' => $recentBookings,

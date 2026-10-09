@@ -5,7 +5,7 @@ namespace App\Notifications;
 use App\Models\Booking;
 
 /**
- * The few lines every guest email repeats about the stay, in the guest's language.
+ * The few lines every guest email repeats about the booking, in the organiser's language.
  */
 class GuestBookingSummary
 {
@@ -14,12 +14,12 @@ class GuestBookingSummary
      */
     public static function lines(Booking $booking, string $locale): array
     {
-        $booking->loadMissing(['apartment', 'unitType']);
+        $booking->loadMissing(['venue', 'spaceType']);
 
         $labels = match ($locale) {
-            'ja' => ['予約番号', 'お部屋', '入居日', '退去日', '人数', '合計'],
-            'id' => ['Referensi', 'Unit', 'Check-in', 'Check-out', 'Penghuni', 'Total'],
-            default => ['Reference', 'Unit', 'Move-in', 'Move-out', 'Residents', 'Total'],
+            'ja' => ['予約番号', 'スペース', '開始日', '終了日', '参加人数', '合計'],
+            'id' => ['Referensi', 'Ruang', 'Mulai', 'Selesai', 'Peserta', 'Total'],
+            default => ['Reference', 'Space', 'Start date', 'End date', 'Attendees', 'Total'],
         };
 
         $dateFormat = $locale === 'ja' ? 'Y年n月j日' : 'j F Y';
@@ -27,11 +27,11 @@ class GuestBookingSummary
 
         return [
             "{$labels[0]}: {$booking->reference}",
-            "{$labels[1]}: {$booking->unit_count} × {$booking->unitType->translatedName($locale)}",
-            "{$labels[2]}: {$format($booking->check_in)}",
-            "{$labels[3]}: {$format($booking->check_out)}",
-            "{$labels[4]}: ".($booking->adults + $booking->children),
-            "{$labels[5]}: {$booking->apartment->currency} ".number_format((float) $booking->total_price, 0, ',', '.'),
+            "{$labels[1]}: {$booking->space_count} × {$booking->spaceType->translatedName($locale)}",
+            "{$labels[2]}: {$format($booking->start_date)}",
+            "{$labels[3]}: {$format($booking->end_date)}",
+            "{$labels[4]}: ".($booking->candidates + $booking->recruiters),
+            "{$labels[5]}: {$booking->venue->currency} ".number_format((float) $booking->total_price, 0, ',', '.'),
         ];
     }
 }

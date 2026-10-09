@@ -1,5 +1,5 @@
 @php
-    $currentApartment = auth()->user()?->currentApartment();
+    $currentVenue = auth()->user()?->currentVenue();
 @endphp
 <!DOCTYPE html>
 <html lang="en">
@@ -7,7 +7,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>{{ $title ?? 'Admin' }} — {{ $currentApartment?->name ?? config('app.name') }}</title>
+    <title>{{ $title ?? 'Admin' }} — {{ $currentVenue?->name ?? config('app.name') }}</title>
 
     @fonts
     @vite(['resources/css/app.css', 'resources/js/app.js'])
@@ -18,7 +18,7 @@
             <details class="group">
                 <summary class="flex cursor-pointer list-none items-center justify-between px-4 py-3 [&::-webkit-details-marker]:hidden">
                     <span class="min-w-0">
-                        <span class="block truncate text-sm font-semibold">{{ $currentApartment?->name }}</span>
+                        <span class="block truncate text-sm font-semibold">{{ $currentVenue?->name }}</span>
                         <span class="block truncate font-mono text-[11px] uppercase tracking-[.14em] text-white/70">Admin · {{ $title ?? 'Dashboard' }}</span>
                     </span>
                     <span class="ml-3 grid size-10 shrink-0 place-items-center rounded border border-white/25 group-open:bg-white/10" aria-label="Menu">
@@ -31,7 +31,7 @@
 
         <aside class="hidden w-56 shrink-0 flex-col bg-ink text-white lg:sticky lg:top-0 lg:flex lg:h-screen">
             <div class="border-b border-white/10 px-4 py-4">
-                <p class="text-sm font-semibold">{{ $currentApartment?->name }}</p>
+                <p class="text-sm font-semibold">{{ $currentVenue?->name }}</p>
                 <p class="mt-0.5 font-mono text-[11px] uppercase tracking-[.14em] text-signal">Admin</p>
             </div>
             <div class="flex flex-1 flex-col justify-between overflow-y-auto"><x-admin-nav /></div>

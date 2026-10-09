@@ -9,7 +9,7 @@ use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
 /**
- * Tells a guest that the team confirmed or cancelled their stay request.
+ * Tells an organiser that the venue team confirmed or cancelled their booking request.
  */
 class BookingStatusChanged extends Notification implements ShouldQueue
 {
@@ -30,17 +30,17 @@ class BookingStatusChanged extends Notification implements ShouldQueue
 
     public function toMail(object $notifiable): MailMessage
     {
-        $booking = $this->booking->loadMissing(['apartment', 'unitType']);
-        $locale = $booking->locale ?? $booking->apartment->default_locale;
+        $booking = $this->booking->loadMissing(['venue', 'spaceType']);
+        $locale = $booking->locale ?? $booking->venue->default_locale;
         $copy = $this->copy($locale)[$booking->status];
 
         return (new MailMessage)
             ->subject(sprintf($copy['subject'], $booking->reference))
             ->greeting(sprintf($copy['greeting'], $booking->guest_name))
-            ->line(sprintf($copy['intro'], $booking->apartment->name))
+            ->line(sprintf($copy['intro'], $booking->venue->name))
             ->lines(GuestBookingSummary::lines($booking, $locale))
             ->line($copy['next'])
-            ->salutation($booking->apartment->name);
+            ->salutation($booking->venue->name);
     }
 
     /**
@@ -51,44 +51,44 @@ class BookingStatusChanged extends Notification implements ShouldQueue
         return [
             'en' => [
                 Booking::STATUS_CONFIRMED => [
-                    'subject' => 'Your stay %s is confirmed',
+                    'subject' => 'Your venue booking %s is confirmed',
                     'greeting' => 'Hello %s,',
-                    'intro' => 'Good news: %s confirmed your stay request.',
-                    'next' => 'Our team will contact you about move-in details and payment.',
+                    'intro' => 'Good news: %s confirmed your venue booking request.',
+                    'next' => 'Our team will contact you about load-in details, set-up and payment.',
                 ],
                 Booking::STATUS_CANCELLED => [
-                    'subject' => 'Your stay request %s was cancelled',
+                    'subject' => 'Your venue booking request %s was cancelled',
                     'greeting' => 'Hello %s,',
-                    'intro' => 'We are sorry: %s could not keep this stay request.',
-                    'next' => 'Please contact us if you would like other dates or another unit.',
+                    'intro' => 'We are sorry: %s could not keep this booking request.',
+                    'next' => 'Please contact us if you would like other dates or another space.',
                 ],
             ],
             'ja' => [
                 Booking::STATUS_CONFIRMED => [
-                    'subject' => 'ご入居が確定しました %s',
+                    'subject' => '会場のご予約が確定しました %s',
                     'greeting' => '%s 様',
-                    'intro' => '%s がリクエストを確定しました。',
-                    'next' => '入居の詳細とお支払いについて、スタッフよりご連絡します。',
+                    'intro' => '%s がご予約リクエストを確定しました。',
+                    'next' => '搬入・設営の詳細とお支払いについて、スタッフよりご連絡します。',
                 ],
                 Booking::STATUS_CANCELLED => [
-                    'subject' => '入居リクエストはキャンセルされました %s',
+                    'subject' => '会場予約リクエストはキャンセルされました %s',
                     'greeting' => '%s 様',
                     'intro' => '申し訳ありません。%s ではこのリクエストをお受けできませんでした。',
-                    'next' => '別の日程やお部屋をご希望の場合はお問い合わせください。',
+                    'next' => '別の日程やスペースをご希望の場合はお問い合わせください。',
                 ],
             ],
             'id' => [
                 Booking::STATUS_CONFIRMED => [
-                    'subject' => 'Sewa %s dikonfirmasi',
+                    'subject' => 'Booking venue %s dikonfirmasi',
                     'greeting' => 'Halo %s,',
-                    'intro' => 'Kabar baik: %s telah mengonfirmasi permintaan sewa Anda.',
-                    'next' => 'Tim kami akan menghubungi Anda soal detail masuk unit dan pembayaran.',
+                    'intro' => 'Kabar baik: %s telah mengonfirmasi permintaan booking venue Anda.',
+                    'next' => 'Tim kami akan menghubungi Anda soal detail load-in, set-up, dan pembayaran.',
                 ],
                 Booking::STATUS_CANCELLED => [
-                    'subject' => 'Permintaan sewa %s dibatalkan',
+                    'subject' => 'Permintaan booking venue %s dibatalkan',
                     'greeting' => 'Halo %s,',
-                    'intro' => 'Mohon maaf, %s tidak dapat melanjutkan permintaan sewa ini.',
-                    'next' => 'Hubungi kami bila Anda ingin tanggal atau unit lain.',
+                    'intro' => 'Mohon maaf, %s tidak dapat melanjutkan permintaan booking ini.',
+                    'next' => 'Hubungi kami bila Anda ingin tanggal atau ruang lain.',
                 ],
             ],
         ][$locale] ?? $this->copy('en');
