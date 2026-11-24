@@ -303,6 +303,16 @@ class CoordinatorChatTest extends TestCase
         $this->assertStringNotContainsString('ignore previous instructions', $this->systemPromptOfLastRequest());
     }
 
+    public function test_the_welcome_hub_scene_sent_by_the_home_page_is_accepted(): void
+    {
+        $this->fakeReply();
+        $token = $this->startConversation();
+
+        $this->postJson('/demo/coordinator/message', ['guest_token' => $token, 'message' => 'What spaces do you have?', 'scene' => 'hub'])->assertOk();
+
+        $this->assertSame('hub', Conversation::firstOrFail()->current_scene);
+    }
+
     public function test_a_failing_model_returns_a_retryable_error_without_leaving_a_duplicate_message(): void
     {
         Http::fake(['llm.test/*' => Http::sequence()->pushStatus(500)->push($this->completion('Back online!'))]);
