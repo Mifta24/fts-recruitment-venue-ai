@@ -11,6 +11,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class CoordinatorChatTest extends TestCase
@@ -262,6 +263,83 @@ class CoordinatorChatTest extends TestCase
 
         Http::assertSentCount(3);
         Http::assertSent(fn (Request $request) => str_contains(collect($request['messages'])->last()['content'] ?? '', 'without calling a tool'));
+    }
+
+    public function test_an_invented_amount_is_replaced_by_a_safe_reply(): void
+    {
+        Http::fake(['llm.test/*' => Http::sequence()
+            ->push($this->completion(null, [$this->toolCall('get_space_detail', ['space_type_slug' => 'deluxe-king'])]))
+            ->push($this->completion('It is Rp 7.777.000 per day.'))]);
+        $token = $this->startConversation('id');
+
+        $reply = $this->postJson('/demo/coordinator/message', ['guest_token' => $token, 'message' => 'Berapa harganya?'])
+            ->assertOk()
+            ->json('message.content');
+
+        $this->assertStringNotContainsString('7.777', $reply);
+        $this->assertStringContainsString('tim venue', $reply);
+    }
+
+    /**
+     * @return array<string, array{string}>
+     */
+    public static function realAmountNotations(): array
+    {
+        return ['dotted' => ['Rp 1.000.000'], 'comma' => ['Rp 1,000,000'], 'plain' => ['IDR 1000000']];
+    }
+
+    #[DataProvider('realAmountNotations')]
+    public function test_an_amount_that_a_tool_returned_is_kept_in_any_notation(string $quoted): void
+    {
+        Http::fake(['llm.test/*' => Http::sequence()
+            ->push($this->completion(null, [$this->toolCall('get_space_detail', ['space_type_slug' => 'deluxe-king'])]))
+            ->push($this->completion("The rate is {$quoted} per day."))]);
+        $token = $this->startConversation();
+
+        $this->postJson('/demo/coordinator/message', ['guest_token' => $token, 'message' => 'How much?'])
+            ->assertOk()
+            ->assertJsonPath('message.content', "The rate is {$quoted} per day.");
+    }
+
+    public function test_an_amount_the_guest_wrote_is_not_treated_as_invented(): void
+    {
+        $this->fakeReply('Understood, a budget of Rp 5.000.000 noted.');
+        $token = $this->startConversation();
+
+        $this->postJson('/demo/coordinator/message', ['guest_token' => $token, 'message' => 'My budget is Rp 5.000.000'])
+            ->assertOk()
+            ->assertJsonPath('message.content', 'Understood, a budget of Rp 5.000.000 noted.');
+    }
+
+    public function test_the_handed_over_notice_follows_the_conversation_language(): void
+    {
+        $this->fakeReply();
+        $token = $this->startConversation('id');
+        Conversation::firstOrFail()->update(['status' => Conversation::STATUS_HANDED_OVER]);
+
+        $this->postJson('/demo/coordinator/message', ['guest_token' => $token, 'message' => 'Halo'])
+            ->assertOk()
+            ->assertJsonPath('message.role', 'system')
+            ->assertJsonPath('message.content', fn (string $text) => str_contains($text, 'Percakapan ini'));
+    }
+
+    public function test_the_knowledge_search_reads_translations_and_ranks_by_match(): void
+    {
+        $this->venue->knowledgeItems()->create(['category' => 'facilities', 'title' => 'Parking', 'body' => 'Basement.', 'translations' => ['id' => ['title' => 'Parkir mobil', 'body' => 'Basement 120 mobil.']], 'is_active' => true]);
+        $this->venue->knowledgeItems()->create(['category' => 'facilities', 'title' => 'Catering', 'body' => 'Garden kitchen.', 'is_active' => true]);
+
+        Http::fake(['llm.test/*' => Http::sequence()
+            ->push($this->completion(null, [$this->toolCall('search_knowledge', ['query' => 'Apakah ada parkir mobil?'])]))
+            ->push($this->completion('Ada parkir basement.'))]);
+        $token = $this->startConversation('id');
+
+        $this->postJson('/demo/coordinator/message', ['guest_token' => $token, 'message' => 'Apakah ada parkir mobil?'])->assertOk();
+
+        Http::assertSent(function (Request $request) {
+            $tool = collect($request['messages'])->firstWhere('role', 'tool');
+
+            return $tool !== null && str_contains($tool['content'], 'Basement 120 mobil') && ! str_contains($tool['content'], 'Garden kitchen');
+        });
     }
 
     public function test_the_reservation_draft_reaches_the_coordinator_without_personal_data(): void

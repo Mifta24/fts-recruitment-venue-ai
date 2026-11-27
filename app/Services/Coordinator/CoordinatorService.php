@@ -36,6 +36,22 @@ class CoordinatorService
 
     private const UNBACKED_DATA_PATTERN = '/(?:rp\.?|idr|usd|jpy|¥|\$)\s?\d|\d[\d.,]*\s?(?:rb|ribu|juta|jt)\b|\[[^\]]+\]/iu';
 
+    /**
+     * Shown when the model names a money amount that no tool returned (and the guest did not say).
+     * Prices only ever come from the tools, so the amount is dropped instead of shown.
+     */
+    private const NO_INVENTED_PRICE_REPLY = [
+        'en' => 'I cannot confirm that amount from here. Tell me the dates and the number of people and I will check the exact price, or I can connect you with the venue team.',
+        'id' => 'Saya belum bisa memastikan nominal itu dari sini. Sebutkan tanggal dan jumlah orangnya, nanti saya cek harga pastinya, atau saya sambungkan ke tim venue.',
+        'ja' => 'その金額はこちらでは確認できません。日程と人数を教えていただければ正確な料金をお調べします。会場スタッフにおつなぎすることもできます。',
+    ];
+
+    private const HANDED_OVER_REPLY = [
+        'en' => 'This conversation is with the venue team now. A team member will respond shortly.',
+        'id' => 'Percakapan ini sekarang ditangani tim venue. Anggota tim akan segera membalas.',
+        'ja' => 'この会話は現在会場スタッフが対応しています。まもなく返信いたします。',
+    ];
+
     public function __construct(private readonly ContentGuard $contentGuard) {}
 
     public function startConversation(Venue $venue, string $locale = 'id'): Conversation
@@ -99,7 +115,7 @@ class CoordinatorService
         if ($conversation->isHandedOver()) {
             return $conversation->messages()->create([
                 'role' => ConversationMessage::ROLE_SYSTEM,
-                'content' => 'This conversation is with the venue team now. A team member will respond shortly.',
+                'content' => self::HANDED_OVER_REPLY[$conversation->locale] ?? self::HANDED_OVER_REPLY['en'],
             ]);
         }
 
@@ -133,6 +149,88 @@ class CoordinatorService
     private function lastGuestMessage(Conversation $conversation): string
     {
         return (string) $conversation->messages()->where('role', ConversationMessage::ROLE_GUEST)->latest('id')->value('content');
+    }
+
+    /**
+     * True when the reply names a money amount that no tool result and no guest message contained.
+     * Amounts are compared as numbers, so "Rp10.000.000", "Rp 10,000,000" and "10 juta" all match 10000000.
+     *
+     * @param  array<int, array<string, mixed>>  $messages
+     */
+    private function inventsAnAmount(string $text, array $messages): bool
+    {
+        $found = preg_match_all('/(?:rp\.?|idr|usd|jpy|¥|￥|\$)\s?(\d[\d.,]*)|(\d[\d.,]*)\s?(?:(juta|jt|ribu|rb)(?![a-z])|(万円)|(円)|(yen)(?![a-z]))/iu', $text, $matches, PREG_SET_ORDER);
+
+        if (! $found) {
+            return false;
+        }
+
+        $known = [];
+        foreach ($messages as $message) {
+            if (! in_array($message['role'] ?? '', ['tool', 'user'], true)) {
+                continue;
+            }
+
+            preg_match_all('/\d[\d.,]*/', (string) ($message['content'] ?? ''), $numbers);
+            foreach ($numbers[0] as $number) {
+                foreach ($this->numberReadings(rtrim($number, '.,')) as $reading) {
+                    $known[] = $reading;
+                }
+            }
+        }
+
+        foreach ($matches as $match) {
+            $unit = strtolower((string) ($match[3] ?? '')) ?: (($match[4] ?? '') !== '' ? '万円' : '');
+            $raw = rtrim($match[1] !== '' ? $match[1] : ($match[2] ?? ''), '.,');
+
+            if ($raw === '') {
+                continue;
+            }
+
+            $multiplier = ['juta' => 1_000_000, 'jt' => 1_000_000, 'ribu' => 1_000, 'rb' => 1_000, '万円' => 10_000][$unit] ?? 1;
+            $candidates = $unit !== '' ? [(float) str_replace(',', '.', $raw) * $multiplier] : $this->numberReadings($raw);
+            $tolerance = $unit !== '' ? 0.05 : 0.0;
+
+            $matched = false;
+            foreach ($candidates as $candidate) {
+                foreach ($known as $value) {
+                    if ($candidate == 0.0 || abs($candidate - $value) <= $value * $tolerance) {
+                        $matched = true;
+                        break 2;
+                    }
+                }
+            }
+
+            if (! $matched) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Every plausible numeric reading of "10.000.000", "10,000,000.00" or "2500000".
+     *
+     * @return list<float>
+     */
+    private function numberReadings(string $raw): array
+    {
+        $readings = [(float) preg_replace('/\D/', '', $raw)];
+
+        if (preg_match('/^\d+(?:\.\d+)?$/', $raw) === 1) {
+            $readings[] = (float) $raw;
+        }
+
+        if (preg_match('/^\d{1,3}(?:,\d{3})*(?:\.\d+)?$/', $raw) === 1) {
+            $readings[] = (float) str_replace(',', '', $raw);
+        }
+
+        if (preg_match('/^\d{1,3}(?:\.\d{3})*(?:,\d+)?$/', $raw) === 1) {
+            $readings[] = (float) str_replace(',', '.', str_replace('.', '', $raw));
+        }
+
+        return $readings;
     }
 
     private function claimsToolData(string $text): bool
@@ -195,6 +293,10 @@ class CoordinatorService
         }
 
         $text = trim((string) ($message['content'] ?? ''));
+
+        if ($this->inventsAnAmount($text, $messages)) {
+            $text = self::NO_INVENTED_PRICE_REPLY[$conversation->locale] ?? self::NO_INVENTED_PRICE_REPLY['en'];
+        }
 
         if ($this->contentGuard->isOffensive($text)) {
             return $this->refuse($conversation, $this->lastGuestMessage($conversation));
