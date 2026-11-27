@@ -454,6 +454,7 @@ class CoordinatorService
             "Current scene: {$scene}",
             'Selected space: '.($space ? "{$space->name} (slug: {$space->slug})" : 'none'),
             'Selected facility: '.($conversation->selectedFacility?->title ?? 'none'),
+            'Spaces (use these names and slugs): '.$conversation->venue->spaceTypes()->where('is_active', true)->orderBy('sort_order')->get()->map(fn ($spaceType) => "{$spaceType->name} ({$spaceType->slug})")->implode(', '),
         ];
 
         $draft = $conversation->reservation_state;
