@@ -30,6 +30,8 @@ jobs:
 
       - run: vendor/bin/pint --test
 
+      - run: composer audit
+
   tests:
     runs-on: ubuntu-latest
     steps:
