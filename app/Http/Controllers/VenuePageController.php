@@ -351,12 +351,23 @@ class VenuePageController extends Controller
 
         return [
             ...$photo,
-            'character' => asset(self::CHARACTER_POSES[$pose]),
+            'character' => $this->versionedAsset(self::CHARACTER_POSES[$pose]),
             'pose' => $pose,
-            'avatarImage' => asset(self::AVATAR_IMAGE),
+            'avatarImage' => $this->versionedAsset(self::AVATAR_IMAGE),
             'avatarZoom' => 'cover',
             'avatarFocus' => '50% 50%',
         ];
+    }
+
+    /**
+     * URL of a character image with its modification time as the version, so a
+     * replaced picture is fetched again instead of served from a CDN cache.
+     */
+    private function versionedAsset(string $path): string
+    {
+        $file = public_path($path);
+
+        return asset($path).(is_file($file) ? '?v='.filemtime($file) : '');
     }
 
     /**
